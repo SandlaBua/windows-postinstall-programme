@@ -146,8 +146,8 @@ function Show-ProfileSelector {
     )
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'Programme installieren'
-    $form.Size = New-Object System.Drawing.Size(340, 420)
+    $form.Text = 'Programm-Pakete installieren'
+    $form.Size = New-Object System.Drawing.Size(440, 420)
     $form.StartPosition = 'CenterScreen'
     $form.TopMost = $true
     $form.FormBorderStyle = 'FixedDialog'
@@ -157,31 +157,23 @@ function Show-ProfileSelector {
     $form.ForeColor = [System.Drawing.Color]::White
 
     $titleLabel = New-Object System.Windows.Forms.Label
-    $titleLabel.Text = 'Programme installieren'
-    $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold)
+    $titleLabel.Text = 'Welche Installations-Pakete möchtest du ausführen?'
+    $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
     $titleLabel.ForeColor = [System.Drawing.Color]::White
     $titleLabel.BackColor = [System.Drawing.Color]::Transparent
     $titleLabel.AutoSize = $true
     $titleLabel.Location = New-Object System.Drawing.Point(20, 18)
     $form.Controls.Add($titleLabel)
 
-    $subtitleLabel = New-Object System.Windows.Forms.Label
-    $subtitleLabel.Text = 'Welche Script-Pakete möchtest du ausführen?'
-    $subtitleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Regular)
-    $subtitleLabel.ForeColor = [System.Drawing.Color]::Gainsboro
-    $subtitleLabel.BackColor = [System.Drawing.Color]::Transparent
-    $subtitleLabel.AutoSize = $true
-    $subtitleLabel.Location = New-Object System.Drawing.Point(22, 52)
-    $form.Controls.Add($subtitleLabel)
-
+   
     $checkboxes = @()
-    $y = 95
+    $y = 65
 
     for ($i = 0; $i -lt $Profiles.Count; $i++) {
         $cb = New-Object System.Windows.Forms.CheckBox
         $cb.Text = $Profiles[$i].Name
         $cb.AutoSize = $true
-        $cb.Location = New-Object System.Drawing.Point(25, $y)
+        $cb.Location = New-Object System.Drawing.Point(35, $y)
         $cb.ForeColor = [System.Drawing.Color]::White
         $cb.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
         $cb.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
@@ -190,11 +182,11 @@ function Show-ProfileSelector {
         $y += 38
     }
 
-    $okButton = New-DarkButton -Text 'OK' -X 120 -Y 330 -Width 90 -Height 32
+    $okButton = New-DarkButton -Text 'OK' -X 220 -Y 330 -Width 90 -Height 32
     $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $form.Controls.Add($okButton)
 
-    $cancelButton = New-DarkButton -Text 'Abbrechen' -X 220 -Y 330 -Width 90 -Height 32
+    $cancelButton = New-DarkButton -Text 'Abbrechen' -X 320 -Y 330 -Width 90 -Height 32
     $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
     $form.Controls.Add($cancelButton)
 
