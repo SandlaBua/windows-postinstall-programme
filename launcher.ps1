@@ -116,6 +116,29 @@ function Invoke-RemoteScript {
     }
 }
 
+function New-DarkButton {
+    param(
+        [string]$Text,
+        [int]$X,
+        [int]$Y,
+        [int]$Width = 90,
+        [int]$Height = 30
+    )
+
+    $button = New-Object System.Windows.Forms.Button
+    $button.Text = $Text
+    $button.Size = New-Object System.Drawing.Size($Width, $Height)
+    $button.Location = New-Object System.Drawing.Point($X, $Y)
+    $button.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 50)
+    $button.ForeColor = [System.Drawing.Color]::White
+    $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $button.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(80, 80, 80)
+    $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(70, 70, 70)
+    $button.FlatAppearance.MouseDownBackColor = [System.Drawing.Color]::FromArgb(90, 90, 90)
+    $button.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Regular)
+    return $button
+}
+
 function Show-ProfileSelector {
     param(
         [Parameter(Mandatory = $true)]
@@ -124,43 +147,54 @@ function Show-ProfileSelector {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Programme installieren'
-    $form.Size = New-Object System.Drawing.Size(300, 300)
+    $form.Size = New-Object System.Drawing.Size(500, 430)
     $form.StartPosition = 'CenterScreen'
     $form.TopMost = $true
     $form.FormBorderStyle = 'FixedDialog'
     $form.MaximizeBox = $false
     $form.MinimizeBox = $false
+    $form.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
+    $form.ForeColor = [System.Drawing.Color]::White
 
-    $label = New-Object System.Windows.Forms.Label
-    $label.Text = 'Welche Script-Pakete möchtest du ausführen?'
-    $label.AutoSize = $true
-    $label.Location = New-Object System.Drawing.Point(20, 20)
-    $form.Controls.Add($label)
+    $titleLabel = New-Object System.Windows.Forms.Label
+    $titleLabel.Text = 'Programme installieren'
+    $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold)
+    $titleLabel.ForeColor = [System.Drawing.Color]::White
+    $titleLabel.BackColor = [System.Drawing.Color]::Transparent
+    $titleLabel.AutoSize = $true
+    $titleLabel.Location = New-Object System.Drawing.Point(20, 18)
+    $form.Controls.Add($titleLabel)
+
+    $subtitleLabel = New-Object System.Windows.Forms.Label
+    $subtitleLabel.Text = 'Welche Script-Pakete möchtest du ausführen?'
+    $subtitleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Regular)
+    $subtitleLabel.ForeColor = [System.Drawing.Color]::Gainsboro
+    $subtitleLabel.BackColor = [System.Drawing.Color]::Transparent
+    $subtitleLabel.AutoSize = $true
+    $subtitleLabel.Location = New-Object System.Drawing.Point(22, 52)
+    $form.Controls.Add($subtitleLabel)
 
     $checkboxes = @()
-    $y = 60
+    $y = 95
 
     for ($i = 0; $i -lt $Profiles.Count; $i++) {
         $cb = New-Object System.Windows.Forms.CheckBox
         $cb.Text = $Profiles[$i].Name
         $cb.AutoSize = $true
         $cb.Location = New-Object System.Drawing.Point(25, $y)
+        $cb.ForeColor = [System.Drawing.Color]::White
+        $cb.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
+        $cb.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
         $form.Controls.Add($cb)
         $checkboxes += $cb
-        $y += 30
+        $y += 38
     }
 
-    $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Text = 'OK'
-    $okButton.Size = New-Object System.Drawing.Size(90, 30)
-    $okButton.Location = New-Object System.Drawing.Point(240, 290)
+    $okButton = New-DarkButton -Text 'OK' -X 280 -Y 335 -Width 90 -Height 32
     $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $form.Controls.Add($okButton)
 
-    $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Text = 'Abbrechen'
-    $cancelButton.Size = New-Object System.Drawing.Size(90, 30)
-    $cancelButton.Location = New-Object System.Drawing.Point(340, 290)
+    $cancelButton = New-DarkButton -Text 'Abbrechen' -X 380 -Y 335 -Width 90 -Height 32
     $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
     $form.Controls.Add($cancelButton)
 
