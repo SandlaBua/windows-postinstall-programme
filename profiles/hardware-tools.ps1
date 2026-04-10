@@ -1,4 +1,4 @@
-. "$PSScriptRoot\..\lib\common.ps1"
+. ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/lib/common.ps1')))
 
 $packages = @(
     @{ Id = 'Logitech.GHUB'; Scope = 'machine'; PreKill = @('lghub', 'lghub_agent', 'lghub_updater') }
