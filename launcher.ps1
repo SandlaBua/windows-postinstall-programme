@@ -1,10 +1,13 @@
+[CmdletBinding()]
+param()
+
 $ErrorActionPreference = 'Stop'
 
-Add-Type -AssemblyName System.Windows.Forms | Out-Null
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
-if (-not $global:PostInstallFailedPackages) {
-    $global:PostInstallFailedPackages = New-Object System.Collections.Generic.List[string]
-}
+$global:PostInstallFailedProfiles = New-Object System.Collections.Generic.List[string]
+$global:PostInstallFailedPackages = New-Object System.Collections.Generic.List[string]
 
 function Show-GuiMessage {
     param(
@@ -31,262 +34,244 @@ function Show-GuiMessage {
     ) | Out-Null
 }
 
-function Add-FailedPackage {
+function Test-IsAdmin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Restart-AsAdminFromUrl {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Id
+        [string]$ScriptUrl
     )
 
-    if (-not $global:PostInstallFailedPackages.Contains($Id)) {
-        $global:PostInstallFailedPackages.Add($Id)
-    }
-}
-
-function Test-Is64BitProcess {
-    return [Environment]::Is64BitProcess
-}
-
-function Get-WingetCommand {
-    return Get-Command winget -ErrorAction SilentlyContinue
-}
-
-function Test-AppInstallerPackage {
     try {
-        $pkg = Get-AppxPackage Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue
-        return ($null -ne $pkg)
-    }
-    catch {
-        return $false
-    }
-}
-
-function Download-File {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Url,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Destination
-    )
-
-    $downloaded = $false
-
-    try {
-        $bits = Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue
-        if ($bits) {
-            Write-Host "Download mit Start-BitsTransfer..." -ForegroundColor DarkGray
-            Start-BitsTransfer -Source $Url -Destination $Destination -ErrorAction Stop
-            $downloaded = $true
+        if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess) {
+            $powershellPath = "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe"
         }
-    }
-    catch {
-        Write-Host "BITS-Download fehlgeschlagen: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
-
-    if ($downloaded -and (Test-Path $Destination)) {
-        return
-    }
-
-    try {
-        $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
-        if ($curl) {
-            Write-Host "Download mit curl.exe..." -ForegroundColor DarkGray
-            & curl.exe -L $Url -o $Destination --silent --show-error
-            if ($LASTEXITCODE -eq 0 -and (Test-Path $Destination)) {
-                $downloaded = $true
-            }
-        }
-    }
-    catch {
-        Write-Host "curl-Download fehlgeschlagen: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
-
-    if (-not $downloaded -or -not (Test-Path $Destination)) {
-        throw "Datei konnte nicht heruntergeladen werden: $Url"
-    }
-}
-
-function Install-Winget {
-    if (-not (Test-Is64BitProcess)) {
-        $msg = @"
-Dieses Script läuft gerade in einer 32-Bit PowerShell (x86).
-
-Bitte starte die normale 64-Bit PowerShell als Administrator
-und führe den Launcher dann erneut aus.
-
-Die x86-PowerShell wird für die winget/App-Installer-Installation hier absichtlich blockiert.
-"@
-        Show-GuiMessage -Message $msg -Title 'Falsche PowerShell-Version' -Type Error
-        throw "32-Bit PowerShell erkannt."
-    }
-
-    Write-Host "winget/App Installer fehlt. Installation wird gestartet..." -ForegroundColor Yellow
-
-    $bundlePath = Join-Path $env:TEMP 'Microsoft.DesktopAppInstaller.msixbundle'
-
-    try {
-        if (Test-Path $bundlePath) {
-            Remove-Item $bundlePath -Force -ErrorAction SilentlyContinue
+        else {
+            $powershellPath = "powershell.exe"
         }
 
-        Download-File -Url 'https://aka.ms/getwinget' -Destination $bundlePath
+        $command = "irm '$ScriptUrl' | iex"
 
-        if (-not (Test-Path $bundlePath)) {
-            throw "Die heruntergeladene Datei wurde nicht gefunden."
-        }
+        Start-Process -FilePath $powershellPath -Verb RunAs -ArgumentList @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-Command", $command
+        )
 
-        Add-AppxPackage -Path $bundlePath -ErrorAction Stop
-        Start-Sleep -Seconds 5
+        exit
     }
     catch {
-        $msg = @"
-winget/App Installer konnte nicht automatisch installiert werden.
-
-Fehler:
-$($_.Exception.Message)
-
-Mögliche Ursachen:
-- falsche PowerShell (x86)
-- Store/App Installer-Komponenten fehlen
-- Download wurde blockiert
-- Netzwerk-/Proxy-Problem
-
-Versuche danach den Launcher erneut.
-"@
-        Show-GuiMessage -Message $msg -Title 'winget Installation fehlgeschlagen' -Type Error
+        Show-GuiMessage -Message "Neustart als Administrator fehlgeschlagen:`n$($_.Exception.Message)" -Title 'Admin-Start fehlgeschlagen' -Type Error
         throw
     }
 }
 
-function Test-WingetAvailable {
-    $wingetCmd = Get-WingetCommand
-    if ($wingetCmd) {
-        Write-Host "winget bereit." -ForegroundColor DarkGray
-        return
-    }
-
-    if (-not (Test-Is64BitProcess)) {
-        $msg = @"
-Dieses Script wurde in Windows PowerShell (x86) gestartet.
-
-Bitte verwende die normale 64-Bit PowerShell als Administrator.
-
-Der Launcher wird jetzt abgebrochen.
-"@
-        Show-GuiMessage -Message $msg -Title '32-Bit PowerShell nicht unterstützt' -Type Error
-        throw "winget-Prüfung in x86 PowerShell abgebrochen."
-    }
-
-    if (-not (Test-AppInstallerPackage)) {
-        Install-Winget
-    }
-    else {
-        Write-Host "App Installer ist vorhanden, aber winget ist noch nicht verfügbar." -ForegroundColor Yellow
-        Start-Sleep -Seconds 3
-    }
-
-    $wingetCmd = Get-WingetCommand
-    if ($wingetCmd) {
-        Write-Host "winget bereit." -ForegroundColor DarkGray
-        return
-    }
-
-    $msg = @"
-winget ist nach der Installation noch nicht verfügbar.
-
-Bitte schließe PowerShell, starte die normale 64-Bit PowerShell als Administrator neu
-und führe den Launcher erneut aus.
-"@
-    Show-GuiMessage -Message $msg -Title 'winget noch nicht verfügbar' -Type Warning
-    throw "winget wurde nach der Installation noch nicht gefunden."
-}
-
-function Test-WingetPackageInstalled {
-    param(
+function Invoke-RemoteScript {
+    param (
         [Parameter(Mandatory = $true)]
-        [string]$Id
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Url
     )
 
     try {
-        $output = winget list --id $Id --exact --accept-source-agreements 2>$null
-        return ($output -match [regex]::Escape($Id))
+        Write-Host ""
+        Write-Host "===== Lade Script: $Name =====" -ForegroundColor Cyan
+        Write-Host "URL: $Url" -ForegroundColor DarkGray
+
+        if ($Url -match 'refs/heads') {
+            Show-GuiMessage -Message "Falscher GitHub-Link erkannt:`n$Url" -Title 'Ungültiger Link' -Type Error
+            throw "Falscher GitHub-Link (refs/heads erkannt): $Url"
+        }
+
+        $code = Invoke-RestMethod -Uri $Url -ErrorAction Stop
+
+        if ([string]::IsNullOrWhiteSpace($code)) {
+            throw "Script leer geladen."
+        }
+
+        if ($code -match 'Show-ProfileSelector') {
+            Show-GuiMessage -Message "Es wurde versehentlich wieder der Launcher statt eines Profils geladen.`n`nURL:`n$Url" -Title 'Falsches Script geladen' -Type Error
+            throw "Falsches Script geladen (Launcher statt Profil)."
+        }
+
+        Write-Host "===== Starte Script: $Name =====" -ForegroundColor Green
+        & ([scriptblock]::Create($code))
+        Write-Host "===== Fertig: $Name =====" -ForegroundColor Green
+        return $true
     }
     catch {
+        if (-not $global:PostInstallFailedProfiles.Contains($Name)) {
+            $global:PostInstallFailedProfiles.Add($Name)
+        }
+
+        Show-GuiMessage -Message "Fehler bei '$Name':`n$($_.Exception.Message)" -Title 'Profil fehlgeschlagen' -Type Error
+        Write-Host "Fehler bei '$Name': $($_.Exception.Message)" -ForegroundColor Red
         return $false
     }
 }
 
-function Stop-IfRunning {
+function Show-ProfileSelector {
     param(
         [Parameter(Mandatory = $true)]
-        [string[]]$ProcessNames
+        [array]$Profiles
     )
 
-    foreach ($name in $ProcessNames) {
-        try {
-            Get-Process -Name $name -ErrorAction SilentlyContinue |
-                Stop-Process -Force -ErrorAction SilentlyContinue
-        }
-        catch {}
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = 'Programme installieren'
+    $form.Size = New-Object System.Drawing.Size(460, 380)
+    $form.StartPosition = 'CenterScreen'
+    $form.TopMost = $true
+    $form.FormBorderStyle = 'FixedDialog'
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = 'Welche Script-Pakete möchtest du ausführen?'
+    $label.AutoSize = $true
+    $label.Location = New-Object System.Drawing.Point(20, 20)
+    $form.Controls.Add($label)
+
+    $checkboxes = @()
+    $y = 60
+
+    for ($i = 0; $i -lt $Profiles.Count; $i++) {
+        $cb = New-Object System.Windows.Forms.CheckBox
+        $cb.Text = $Profiles[$i].Name
+        $cb.AutoSize = $true
+        $cb.Location = New-Object System.Drawing.Point(25, $y)
+        $form.Controls.Add($cb)
+        $checkboxes += $cb
+        $y += 30
     }
+
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Text = 'OK'
+    $okButton.Size = New-Object System.Drawing.Size(90, 30)
+    $okButton.Location = New-Object System.Drawing.Point(240, 290)
+    $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $form.Controls.Add($okButton)
+
+    $cancelButton = New-Object System.Windows.Forms.Button
+    $cancelButton.Text = 'Abbrechen'
+    $cancelButton.Size = New-Object System.Drawing.Size(90, 30)
+    $cancelButton.Location = New-Object System.Drawing.Point(340, 290)
+    $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $form.Controls.Add($cancelButton)
+
+    $form.AcceptButton = $okButton
+    $form.CancelButton = $cancelButton
+
+    $dialogResult = $form.ShowDialog()
+
+    if ($dialogResult -ne [System.Windows.Forms.DialogResult]::OK) {
+        return $null
+    }
+
+    $selectedProfiles = @()
+    for ($i = 0; $i -lt $checkboxes.Count; $i++) {
+        if ($checkboxes[$i].Checked) {
+            $selectedProfiles += $Profiles[$i]
+        }
+    }
+
+    return $selectedProfiles
 }
 
-function Install-WingetPackage {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Id,
+function Show-FinalSummary {
+    $profileFailures = @($global:PostInstallFailedProfiles | Select-Object -Unique)
+    $packageFailures = @($global:PostInstallFailedPackages | Select-Object -Unique)
 
-        [ValidateSet('machine', 'user')]
-        [string]$Scope = 'machine',
-
-        [string[]]$PreKill = @(),
-
-        [switch]$SkipIfInstalled
-    )
-
-    if ($SkipIfInstalled -and (Test-WingetPackageInstalled -Id $Id)) {
-        Write-Host "Bereits installiert: $Id" -ForegroundColor DarkGray
+    if ($profileFailures.Count -eq 0 -and $packageFailures.Count -eq 0) {
+        Show-GuiMessage -Message 'Alle ausgewählten Scripts und Pakete wurden erfolgreich verarbeitet.' -Title 'Fertig' -Type Info
         return
     }
 
-    if ($PreKill.Count -gt 0) {
-        Stop-IfRunning -ProcessNames $PreKill
-        Start-Sleep -Seconds 2
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("Nicht alles hat funktioniert.")
+    $lines.Add("")
+
+    if ($profileFailures.Count -gt 0) {
+        $lines.Add("Fehlgeschlagene Profile:")
+        foreach ($item in $profileFailures) {
+            $lines.Add(" - $item")
+        }
+        $lines.Add("")
     }
 
-    Write-Host ""
-    Write-Host "==== Installiere: $Id ====" -ForegroundColor Cyan
-
-    try {
-        $args = @(
-            'install',
-            '--id', $Id,
-            '--exact',
-            '--scope', $Scope,
-            '--silent',
-            '--accept-source-agreements',
-            '--accept-package-agreements',
-            '--disable-interactivity'
-        )
-
-        $proc = Start-Process -FilePath 'winget' -ArgumentList $args -Wait -PassThru -NoNewWindow
-
-        if ($proc.ExitCode -eq 0) {
-            Write-Host "OK: $Id" -ForegroundColor Green
-        }
-        else {
-            Add-FailedPackage -Id $Id
-            $msg = "Installation von '$Id' ist fehlgeschlagen. ExitCode: $($proc.ExitCode)"
-            Show-GuiMessage -Message $msg -Title 'Paketinstallation fehlgeschlagen' -Type Warning
-            Write-Host $msg -ForegroundColor Yellow
+    if ($packageFailures.Count -gt 0) {
+        $lines.Add("Fehlgeschlagene Pakete:")
+        foreach ($item in $packageFailures) {
+            $lines.Add(" - $item")
         }
     }
-    catch {
-        Add-FailedPackage -Id $Id
-        $msg = "Fehler bei '$Id': $($_.Exception.Message)"
-        Show-GuiMessage -Message $msg -Title 'Paketinstallation fehlgeschlagen' -Type Error
-        Write-Host $msg -ForegroundColor Red
-    }
+
+    Show-GuiMessage -Message ($lines -join [Environment]::NewLine) -Title 'Zusammenfassung' -Type Warning
 }
 
-Test-WingetAvailable
+$mainScriptUrl = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/launcher.ps1'
+
+$scriptProfiles = @(
+    @{
+        Name = 'Browser & Kommunikation'
+        Url  = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/profiles/browser-communication.ps1'
+    }
+    @{
+        Name = 'Gaming & Launcher'
+        Url  = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/profiles/gaming.ps1'
+    }
+    @{
+        Name = 'Hardware Tools'
+        Url  = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/profiles/hardware-tools.ps1'
+    }
+    @{
+        Name = 'Remote & Netzwerk'
+        Url  = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/profiles/remote-network.ps1'
+    }
+    @{
+        Name = 'Media & Utility'
+        Url  = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/profiles/media-utility.ps1'
+    }
+    @{
+        Name = '3D & Printing'
+        Url  = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/profiles/printing-3d.ps1'
+    }
+)
+
+if (-not [Environment]::Is64BitProcess) {
+    Show-GuiMessage -Message "Du hast die 32-Bit PowerShell gestartet.`n`nBitte verwende die normale 64-Bit PowerShell als Administrator." -Title 'Falsche PowerShell-Version' -Type Error
+    exit
+}
+
+if (-not (Test-IsAdmin)) {
+    Restart-AsAdminFromUrl -ScriptUrl $mainScriptUrl
+}
+
+try {
+    $selectedProfiles = Show-ProfileSelector -Profiles $scriptProfiles
+
+    if ($null -eq $selectedProfiles) {
+        Show-GuiMessage -Message 'Vorgang abgebrochen.' -Title 'Abbruch' -Type Warning
+        exit
+    }
+
+    if ($selectedProfiles.Count -eq 0) {
+        Show-GuiMessage -Message 'Es wurde nichts ausgewählt.' -Title 'Keine Auswahl' -Type Warning
+        exit
+    }
+
+    foreach ($profile in $selectedProfiles) {
+        [void](Invoke-RemoteScript -Name $profile.Name -Url $profile.Url)
+    }
+
+    Show-FinalSummary
+}
+catch {
+    Show-GuiMessage -Message "Unerwarteter Fehler:`n$($_.Exception.Message)" -Title 'Launcher Fehler' -Type Error
+    throw
+}
