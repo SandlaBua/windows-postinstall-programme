@@ -2,7 +2,6 @@
 
 $packages = @(
     @{ Id = 'Parsec.Parsec'; Scope = 'user'; PreKill = @('parsec', 'parsecd') }
-    @{ Id = 'Parsec.ParsecVDD'; Scope = 'machine'; PreKill = @() }
     @{ Id = 'Tailscale.Tailscale'; Scope = 'machine'; PreKill = @('tailscale', 'tailscale-ipn') }
 )
 
