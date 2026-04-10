@@ -2,6 +2,10 @@ $ErrorActionPreference = 'Stop'
 
 Add-Type -AssemblyName System.Windows.Forms | Out-Null
 
+if (-not $global:PostInstallFailedPackages) {
+    $global:PostInstallFailedPackages = New-Object System.Collections.Generic.List[string]
+}
+
 function Show-GuiMessage {
     param(
         [Parameter(Mandatory = $true)]
@@ -25,6 +29,17 @@ function Show-GuiMessage {
         [System.Windows.Forms.MessageBoxButtons]::OK,
         $icon
     ) | Out-Null
+}
+
+function Add-FailedPackage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Id
+    )
+
+    if (-not $global:PostInstallFailedPackages.Contains($Id)) {
+        $global:PostInstallFailedPackages.Add($Id)
+    }
 }
 
 function Test-Is64BitProcess {
@@ -56,7 +71,6 @@ function Download-File {
 
     $downloaded = $false
 
-    # 1) BITS zuerst
     try {
         $bits = Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue
         if ($bits) {
@@ -73,7 +87,6 @@ function Download-File {
         return
     }
 
-    # 2) Fallback auf curl.exe
     try {
         $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
         if ($curl) {
@@ -262,12 +275,14 @@ function Install-WingetPackage {
             Write-Host "OK: $Id" -ForegroundColor Green
         }
         else {
+            Add-FailedPackage -Id $Id
             $msg = "Installation von '$Id' ist fehlgeschlagen. ExitCode: $($proc.ExitCode)"
             Show-GuiMessage -Message $msg -Title 'Paketinstallation fehlgeschlagen' -Type Warning
             Write-Host $msg -ForegroundColor Yellow
         }
     }
     catch {
+        Add-FailedPackage -Id $Id
         $msg = "Fehler bei '$Id': $($_.Exception.Message)"
         Show-GuiMessage -Message $msg -Title 'Paketinstallation fehlgeschlagen' -Type Error
         Write-Host $msg -ForegroundColor Red
