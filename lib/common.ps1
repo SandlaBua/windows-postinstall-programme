@@ -1,10 +1,51 @@
 $ErrorActionPreference = 'Stop'
 
-function Test-WingetAvailable {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        throw "winget wurde nicht gefunden."
+# ---------------------------------------
+# Winget sicherstellen
+# ---------------------------------------
+
+function Install-Winget {
+    Write-Host "Installiere winget..." -ForegroundColor Yellow
+
+    try {
+        # Microsoft offizieller Installer
+        $url = "https://aka.ms/getwinget"
+        $file = "$env:TEMP\winget.appxbundle"
+
+        Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
+
+        Add-AppxPackage -Path $file
+
+        Write-Host "winget erfolgreich installiert." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Fehler bei winget Installation: $($_.Exception.Message)" -ForegroundColor Red
+        throw
     }
 }
+
+function Test-WingetAvailable {
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+
+    if (-not $winget) {
+        Write-Host "winget nicht gefunden → Installation wird gestartet..." -ForegroundColor Yellow
+        Install-Winget
+
+        Start-Sleep -Seconds 3
+
+        $winget = Get-Command winget -ErrorAction SilentlyContinue
+
+        if (-not $winget) {
+            throw "winget konnte nicht installiert werden."
+        }
+    }
+
+    Write-Host "winget bereit." -ForegroundColor DarkGray
+}
+
+# ---------------------------------------
+# Check ob Programm schon installiert
+# ---------------------------------------
 
 function Test-WingetPackageInstalled {
     param(
@@ -21,6 +62,10 @@ function Test-WingetPackageInstalled {
     }
 }
 
+# ---------------------------------------
+# Prozesse killen
+# ---------------------------------------
+
 function Stop-IfRunning {
     param(
         [Parameter(Mandatory = $true)]
@@ -35,6 +80,10 @@ function Stop-IfRunning {
         catch {}
     }
 }
+
+# ---------------------------------------
+# Installation
+# ---------------------------------------
 
 function Install-WingetPackage {
     param(
@@ -59,21 +108,21 @@ function Install-WingetPackage {
         Start-Sleep -Seconds 2
     }
 
-    $args = @(
-        'install',
-        '--id', $Id,
-        '--exact',
-        '--scope', $Scope,
-        '--silent',
-        '--accept-source-agreements',
-        '--accept-package-agreements',
-        '--disable-interactivity'
-    )
-
     Write-Host ""
     Write-Host "==== Installiere: $Id ====" -ForegroundColor Cyan
 
     try {
+        $args = @(
+            'install',
+            '--id', $Id,
+            '--exact',
+            '--scope', $Scope,
+            '--silent',
+            '--accept-source-agreements',
+            '--accept-package-agreements',
+            '--disable-interactivity'
+        )
+
         $proc = Start-Process -FilePath 'winget' -ArgumentList $args -Wait -PassThru -NoNewWindow
 
         if ($proc.ExitCode -eq 0) {
@@ -87,5 +136,9 @@ function Install-WingetPackage {
         Write-Host "Fehler bei ${Id}: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
+
+# ---------------------------------------
+# INIT (wird automatisch ausgeführt)
+# ---------------------------------------
 
 Test-WingetAvailable
