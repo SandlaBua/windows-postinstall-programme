@@ -124,7 +124,7 @@ function Show-ProfileSelector {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Programme installieren'
-    $form.Size = New-Object System.Drawing.Size(460, 380)
+    $form.Size = New-Object System.Drawing.Size(300, 300)
     $form.StartPosition = 'CenterScreen'
     $form.TopMost = $true
     $form.FormBorderStyle = 'FixedDialog'
