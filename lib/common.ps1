@@ -1,51 +1,61 @@
 $ErrorActionPreference = 'Stop'
 
-# ---------------------------------------
-# Winget sicherstellen
-# ---------------------------------------
+function Get-WingetCommand {
+    return Get-Command winget -ErrorAction SilentlyContinue
+}
 
-function Install-Winget {
-    Write-Host "Installiere winget..." -ForegroundColor Yellow
-
+function Test-AppInstallerPackage {
     try {
-        # Microsoft offizieller Installer
-        $url = "https://aka.ms/getwinget"
-        $file = "$env:TEMP\winget.appxbundle"
-
-        Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
-
-        Add-AppxPackage -Path $file
-
-        Write-Host "winget erfolgreich installiert." -ForegroundColor Green
+        $pkg = Get-AppxPackage Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue
+        return ($null -ne $pkg)
     }
     catch {
-        Write-Host "Fehler bei winget Installation: $($_.Exception.Message)" -ForegroundColor Red
-        throw
+        return $false
+    }
+}
+
+function Install-Winget {
+    Write-Host "winget/App Installer fehlt. Installation wird gestartet..." -ForegroundColor Yellow
+
+    $bundlePath = Join-Path $env:TEMP 'Microsoft.DesktopAppInstaller.msixbundle'
+
+    try {
+        Invoke-WebRequest -Uri 'https://aka.ms/getwinget' -OutFile $bundlePath -UseBasicParsing
+        Add-AppxPackage -Path $bundlePath -ErrorAction Stop
+        Start-Sleep -Seconds 5
+    }
+    catch {
+        throw "Winget/App Installer konnte nicht installiert werden: $($_.Exception.Message)"
     }
 }
 
 function Test-WingetAvailable {
-    $winget = Get-Command winget -ErrorAction SilentlyContinue
-
-    if (-not $winget) {
-        Write-Host "winget nicht gefunden → Installation wird gestartet..." -ForegroundColor Yellow
-        Install-Winget
-
-        Start-Sleep -Seconds 3
-
-        $winget = Get-Command winget -ErrorAction SilentlyContinue
-
-        if (-not $winget) {
-            throw "winget konnte nicht installiert werden."
-        }
+    $wingetCmd = Get-WingetCommand
+    if ($wingetCmd) {
+        Write-Host "winget bereit." -ForegroundColor DarkGray
+        return
     }
 
-    Write-Host "winget bereit." -ForegroundColor DarkGray
-}
+    if (-not (Test-AppInstallerPackage)) {
+        Install-Winget
+    }
+    else {
+        Write-Host "App Installer ist vorhanden, aber winget ist in dieser Session noch nicht verfügbar." -ForegroundColor Yellow
+        Start-Sleep -Seconds 3
+    }
 
-# ---------------------------------------
-# Check ob Programm schon installiert
-# ---------------------------------------
+    $wingetCmd = Get-WingetCommand
+    if ($wingetCmd) {
+        Write-Host "winget bereit." -ForegroundColor DarkGray
+        return
+    }
+
+    if (Test-AppInstallerPackage) {
+        throw "App Installer wurde erkannt, aber 'winget' ist noch nicht verfügbar. Starte das Hauptscript bitte einmal neu."
+    }
+
+    throw "winget wurde nicht gefunden."
+}
 
 function Test-WingetPackageInstalled {
     param(
@@ -62,10 +72,6 @@ function Test-WingetPackageInstalled {
     }
 }
 
-# ---------------------------------------
-# Prozesse killen
-# ---------------------------------------
-
 function Stop-IfRunning {
     param(
         [Parameter(Mandatory = $true)]
@@ -80,10 +86,6 @@ function Stop-IfRunning {
         catch {}
     }
 }
-
-# ---------------------------------------
-# Installation
-# ---------------------------------------
 
 function Install-WingetPackage {
     param(
@@ -136,9 +138,5 @@ function Install-WingetPackage {
         Write-Host "Fehler bei ${Id}: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
-
-# ---------------------------------------
-# INIT (wird automatisch ausgeführt)
-# ---------------------------------------
 
 Test-WingetAvailable
