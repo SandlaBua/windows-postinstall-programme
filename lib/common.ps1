@@ -1,6 +1,11 @@
 $ErrorActionPreference = 'Stop'
 
-Add-Type -AssemblyName System.Windows.Forms | Out-Null
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+} catch {}
+
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing | Out-Null
 
 if (-not $global:PostInstallFailedPackages) {
     $global:PostInstallFailedPackages = New-Object System.Collections.Generic.List[string]
@@ -40,6 +45,84 @@ function Add-FailedPackage {
     if (-not $global:PostInstallFailedPackages.Contains($Id)) {
         $global:PostInstallFailedPackages.Add($Id)
     }
+}
+
+function Show-StatusWindow {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Title,
+
+        [string]$InitialText = 'Starte Installation...'
+    )
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = $Title
+    $form.Size = New-Object System.Drawing.Size(460, 160)
+    $form.StartPosition = 'CenterScreen'
+    $form.TopMost = $true
+    $form.FormBorderStyle = 'FixedDialog'
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
+    $form.ForeColor = [System.Drawing.Color]::White
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = $InitialText
+    $label.ForeColor = [System.Drawing.Color]::White
+    $label.BackColor = [System.Drawing.Color]::Transparent
+    $label.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    $label.AutoSize = $true
+    $label.Location = New-Object System.Drawing.Point(20, 20)
+
+    $progress = New-Object System.Windows.Forms.ProgressBar
+    $progress.Location = New-Object System.Drawing.Point(20, 65)
+    $progress.Size = New-Object System.Drawing.Size(400, 22)
+    $progress.Style = 'Continuous'
+
+    $form.Controls.Add($label)
+    $form.Controls.Add($progress)
+
+    $form.Show()
+    $form.Refresh()
+
+    return @{
+        Form     = $form
+        Label    = $label
+        Progress = $progress
+    }
+}
+
+function Update-StatusWindow {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Window,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Text,
+
+        [int]$Percent = -1
+    )
+
+    $Window.Label.Text = $Text
+
+    if ($Percent -ge 0) {
+        $value = [Math]::Max(0, [Math]::Min(100, $Percent))
+        $Window.Progress.Value = $value
+    }
+
+    $Window.Form.Refresh()
+    [System.Windows.Forms.Application]::DoEvents()
+}
+
+function Close-StatusWindow {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Window
+    )
+
+    Start-Sleep -Milliseconds 400
+    $Window.Form.Close()
+    $Window.Form.Dispose()
 }
 
 function Test-Is64BitProcess {
@@ -113,8 +196,6 @@ Dieses Script läuft gerade in einer 32-Bit PowerShell (x86).
 
 Bitte starte die normale 64-Bit PowerShell als Administrator
 und führe den Launcher dann erneut aus.
-
-Die x86-PowerShell wird für die winget/App-Installer-Installation hier absichtlich blockiert.
 "@
         Show-GuiMessage -Message $msg -Title 'Falsche PowerShell-Version' -Type Error
         throw "32-Bit PowerShell erkannt."
@@ -150,8 +231,6 @@ Mögliche Ursachen:
 - Store/App Installer-Komponenten fehlen
 - Download wurde blockiert
 - Netzwerk-/Proxy-Problem
-
-Versuche danach den Launcher erneut.
 "@
         Show-GuiMessage -Message $msg -Title 'winget Installation fehlgeschlagen' -Type Error
         throw
@@ -170,8 +249,6 @@ function Test-WingetAvailable {
 Dieses Script wurde in Windows PowerShell (x86) gestartet.
 
 Bitte verwende die normale 64-Bit PowerShell als Administrator.
-
-Der Launcher wird jetzt abgebrochen.
 "@
         Show-GuiMessage -Message $msg -Title '32-Bit PowerShell nicht unterstützt' -Type Error
         throw "winget-Prüfung in x86 PowerShell abgebrochen."
