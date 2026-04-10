@@ -147,7 +147,7 @@ function Show-ProfileSelector {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Programme installieren'
-    $form.Size = New-Object System.Drawing.Size(500, 430)
+    $form.Size = New-Object System.Drawing.Size(340, 420)
     $form.StartPosition = 'CenterScreen'
     $form.TopMost = $true
     $form.FormBorderStyle = 'FixedDialog'
@@ -190,11 +190,11 @@ function Show-ProfileSelector {
         $y += 38
     }
 
-    $okButton = New-DarkButton -Text 'OK' -X 280 -Y 335 -Width 90 -Height 32
+    $okButton = New-DarkButton -Text 'OK' -X 120 -Y 330 -Width 90 -Height 32
     $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $form.Controls.Add($okButton)
 
-    $cancelButton = New-DarkButton -Text 'Abbrechen' -X 380 -Y 335 -Width 90 -Height 32
+    $cancelButton = New-DarkButton -Text 'Abbrechen' -X 220 -Y 330 -Width 90 -Height 32
     $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
     $form.Controls.Add($cancelButton)
 
