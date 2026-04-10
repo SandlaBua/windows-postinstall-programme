@@ -3,6 +3,34 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+function Show-GuiMessage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+
+        [string]$Title = 'Windows Postinstall',
+
+        [ValidateSet('Info', 'Warning', 'Error')]
+        [string]$Type = 'Info'
+    )
+
+    $icon = switch ($Type) {
+        'Info'    { [System.Windows.Forms.MessageBoxIcon]::Information }
+        'Warning' { [System.Windows.Forms.MessageBoxIcon]::Warning }
+        'Error'   { [System.Windows.Forms.MessageBoxIcon]::Error }
+    }
+
+    [System.Windows.Forms.MessageBox]::Show(
+        $Message,
+        $Title,
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        $icon
+    ) | Out-Null
+}
+
 function Test-IsAdmin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -15,15 +43,28 @@ function Restart-AsAdminFromUrl {
         [string]$ScriptUrl
     )
 
-    $command = "irm '$ScriptUrl' | iex"
+    try {
+        if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess) {
+            $powershellPath = "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe"
+        }
+        else {
+            $powershellPath = "powershell.exe"
+        }
 
-    Start-Process powershell.exe -Verb RunAs -ArgumentList @(
-        "-NoProfile",
-        "-ExecutionPolicy Bypass",
-        "-Command", $command
-    )
+        $command = "irm '$ScriptUrl' | iex"
 
-    exit
+        Start-Process -FilePath $powershellPath -Verb RunAs -ArgumentList @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-Command", $command
+        )
+
+        exit
+    }
+    catch {
+        Show-GuiMessage -Message "Neustart als Administrator fehlgeschlagen:`n$($_.Exception.Message)" -Title 'Admin-Start fehlgeschlagen' -Type Error
+        throw
+    }
 }
 
 function Invoke-RemoteScript {
@@ -40,20 +81,20 @@ function Invoke-RemoteScript {
         Write-Host "===== Lade Script: $Name =====" -ForegroundColor Cyan
         Write-Host "URL: $Url" -ForegroundColor DarkGray
 
-        # Schutz gegen falsche URLs
-        if ($Url -match "refs/heads") {
+        if ($Url -match 'refs/heads') {
+            Show-GuiMessage -Message "Falscher GitHub-Link erkannt:`n$Url" -Title 'Ungültiger Link' -Type Error
             throw "Falscher GitHub-Link (refs/heads erkannt): $Url"
         }
 
         $code = Invoke-RestMethod -Uri $Url -ErrorAction Stop
 
         if ([string]::IsNullOrWhiteSpace($code)) {
-            throw "Script leer geladen"
+            throw "Script leer geladen."
         }
 
-        # Schutz: falls du aus Versehen wieder den Launcher lädst
-        if ($code -match "Show-ProfileSelector") {
-            throw "Falsches Script geladen (Launcher statt Profil)"
+        if ($code -match 'Show-ProfileSelector') {
+            Show-GuiMessage -Message "Es wurde versehentlich wieder der Launcher statt eines Profils geladen.`n`nURL:`n$Url" -Title 'Falsches Script geladen' -Type Error
+            throw "Falsches Script geladen (Launcher statt Profil)."
         }
 
         Write-Host "===== Starte Script: $Name =====" -ForegroundColor Green
@@ -61,75 +102,80 @@ function Invoke-RemoteScript {
         Write-Host "===== Fertig: $Name =====" -ForegroundColor Green
     }
     catch {
+        Show-GuiMessage -Message "Fehler bei '$Name':`n$($_.Exception.Message)" -Title 'Profil fehlgeschlagen' -Type Error
         Write-Host "Fehler bei '$Name': $($_.Exception.Message)" -ForegroundColor Red
     }
 }
 
 function Show-ProfileSelector {
-    param([array]$Profiles)
-
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
+    param(
+        [Parameter(Mandatory = $true)]
+        [array]$Profiles
+    )
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Programme installieren'
-    $form.Size = New-Object System.Drawing.Size(450, 360)
+    $form.Size = New-Object System.Drawing.Size(460, 380)
     $form.StartPosition = 'CenterScreen'
     $form.TopMost = $true
+    $form.FormBorderStyle = 'FixedDialog'
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
 
     $label = New-Object System.Windows.Forms.Label
     $label.Text = 'Welche Script-Pakete möchtest du ausführen?'
     $label.AutoSize = $true
-    $label.Location = New-Object System.Drawing.Point(20,20)
+    $label.Location = New-Object System.Drawing.Point(20, 20)
     $form.Controls.Add($label)
 
     $checkboxes = @()
     $y = 60
 
-    foreach ($profile in $Profiles) {
+    for ($i = 0; $i -lt $Profiles.Count; $i++) {
         $cb = New-Object System.Windows.Forms.CheckBox
-        $cb.Text = $profile.Name
+        $cb.Text = $Profiles[$i].Name
         $cb.AutoSize = $true
-        $cb.Location = New-Object System.Drawing.Point(25,$y)
+        $cb.Location = New-Object System.Drawing.Point(25, $y)
         $form.Controls.Add($cb)
         $checkboxes += $cb
         $y += 30
     }
 
-    $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = "OK"
-    $ok.Location = New-Object System.Drawing.Point(230,260)
-    $ok.DialogResult = "OK"
-    $form.Controls.Add($ok)
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Text = 'OK'
+    $okButton.Size = New-Object System.Drawing.Size(90, 30)
+    $okButton.Location = New-Object System.Drawing.Point(240, 290)
+    $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $form.Controls.Add($okButton)
 
-    $cancel = New-Object System.Windows.Forms.Button
-    $cancel.Text = "Abbrechen"
-    $cancel.Location = New-Object System.Drawing.Point(330,260)
-    $cancel.DialogResult = "Cancel"
-    $form.Controls.Add($cancel)
+    $cancelButton = New-Object System.Windows.Forms.Button
+    $cancelButton.Text = 'Abbrechen'
+    $cancelButton.Size = New-Object System.Drawing.Size(90, 30)
+    $cancelButton.Location = New-Object System.Drawing.Point(340, 290)
+    $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $form.Controls.Add($cancelButton)
 
-    $form.AcceptButton = $ok
-    $form.CancelButton = $cancel
+    $form.AcceptButton = $okButton
+    $form.CancelButton = $cancelButton
 
-    if ($form.ShowDialog() -ne "OK") {
+    $dialogResult = $form.ShowDialog()
+
+    if ($dialogResult -ne [System.Windows.Forms.DialogResult]::OK) {
         return $null
     }
 
-    $selected = @()
-
-    for ($i=0; $i -lt $checkboxes.Count; $i++) {
+    $selectedProfiles = @()
+    for ($i = 0; $i -lt $checkboxes.Count; $i++) {
         if ($checkboxes[$i].Checked) {
-            $selected += $Profiles[$i]
+            $selectedProfiles += $Profiles[$i]
         }
     }
 
-    return $selected
+    return $selectedProfiles
 }
 
-# 🔥 WICHTIG: richtiger Raw-Link zu DIESEM Script
-$mainScriptUrl = "https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/launcher.ps1"
+$mainScriptUrl = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/launcher.ps1'
 
-# 🔥 PROFILE MIT KORREKTEN LINKS
 $scriptProfiles = @(
     @{
         Name = 'Browser & Kommunikation'
@@ -157,28 +203,35 @@ $scriptProfiles = @(
     }
 )
 
-# Admin check
+if (-not [Environment]::Is64BitProcess) {
+    Show-GuiMessage -Message "Du hast die 32-Bit PowerShell gestartet.`n`nBitte verwende die normale 64-Bit PowerShell als Administrator." -Title 'Falsche PowerShell-Version' -Type Error
+    exit
+}
+
 if (-not (Test-IsAdmin)) {
     Restart-AsAdminFromUrl -ScriptUrl $mainScriptUrl
 }
 
-# GUI
-$selectedProfiles = Show-ProfileSelector -Profiles $scriptProfiles
+try {
+    $selectedProfiles = Show-ProfileSelector -Profiles $scriptProfiles
 
-if ($null -eq $selectedProfiles) {
-    Write-Host "Abgebrochen." -ForegroundColor Yellow
-    exit
+    if ($null -eq $selectedProfiles) {
+        Show-GuiMessage -Message 'Vorgang abgebrochen.' -Title 'Abbruch' -Type Warning
+        exit
+    }
+
+    if ($selectedProfiles.Count -eq 0) {
+        Show-GuiMessage -Message 'Es wurde nichts ausgewählt.' -Title 'Keine Auswahl' -Type Warning
+        exit
+    }
+
+    foreach ($profile in $selectedProfiles) {
+        Invoke-RemoteScript -Name $profile.Name -Url $profile.Url
+    }
+
+    Show-GuiMessage -Message 'Alle ausgewählten Scripts wurden verarbeitet.' -Title 'Fertig' -Type Info
 }
-
-if ($selectedProfiles.Count -eq 0) {
-    Write-Host "Nichts ausgewählt." -ForegroundColor Yellow
-    exit
+catch {
+    Show-GuiMessage -Message "Unerwarteter Fehler:`n$($_.Exception.Message)" -Title 'Launcher Fehler' -Type Error
+    throw
 }
-
-# Execute
-foreach ($profile in $selectedProfiles) {
-    Invoke-RemoteScript -Name $profile.Name -Url $profile.Url
-}
-
-Write-Host ""
-Write-Host "Fertig." -ForegroundColor Cyan
