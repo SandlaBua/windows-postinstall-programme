@@ -1,8 +1,8 @@
-. "$PSScriptRoot\..\lib\common.ps1"
+. ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/lib/common.ps1')))
 
 $packages = @(
     @{ Id = 'Creality.CrealityScan'; Scope = 'machine'; PreKill = @('crealityscan') }
-    @{ Id = 'Bambulab.Bambustudio'; Scope = 'machine'; PreKill = @('bambu studio', 'bambustudio') }
+    @{ Id = 'Bambulab.BambuStudio'; Scope = 'machine'; PreKill = @('bambustudio') }
 )
 
 foreach ($pkg in $packages) {
