@@ -27,7 +27,6 @@ Programme sind in Kategorien aufgeteilt und können entweder **einzeln** oder **
 windows-postinstall-programme/
 │
 ├─ launcher.ps1
-├─ launcher.vbs
 │
 ├─ lib/
 │  └─ common.ps1
@@ -81,27 +80,13 @@ Hier sind alle Programme nach Kategorien definiert, z. B.:
 
 ---
 
-### `launcher.vbs`
-
-Optionaler Starter, damit **keine PowerShell-Konsole sichtbar** ist.
-
-Wenn du die Konsole nicht sehen willst, starte **nicht direkt `launcher.ps1`**, sondern `launcher.vbs`.
-
----
-
 ## Start
 
-### Variante 1: Direkt über PowerShell
+### Direkt über PowerShell
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/launcher.ps1 | iex
 ```
-
-### Variante 2: Ohne sichtbare Shell
-
-Über `launcher.vbs`
-
----
 
 ## Voraussetzungen
 
@@ -149,18 +134,6 @@ Du musst also nicht jedes Mal den Launcher selbst umbauen.
 
 ## Bekannte Hinweise
 
-### TLS / SSL Fehler
-
-Falls beim Start über `irm` ein TLS- oder SSL-Fehler kommt, nutze:
-
-```powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-```
-
-Direkt vor dem `irm`-Befehl.
-
----
-
 ### `winget` fehlt
 
 Wenn `winget` auf einem frischen Windows nicht vorhanden ist, versucht `common.ps1`, es automatisch zu installieren.
@@ -170,14 +143,6 @@ Falls `winget` danach noch nicht verfügbar ist:
 * PowerShell schließen
 * neu als Administrator öffnen
 * Launcher erneut starten
-
----
-
-### Keine Konsole sichtbar
-
-Das geht nicht sauber, wenn du den Launcher direkt per `irm ... | iex` startest.
-
-Wenn du **gar keine Shell sehen willst**, nutze `launcher.vbs`.
 
 ---
 
