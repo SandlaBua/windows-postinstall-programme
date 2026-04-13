@@ -3,6 +3,91 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
+function Show-GuiMessage {
+    param(
+        [string]$Message,
+        [string]$Title = 'Windows Postinstall',
+        [ValidateSet('Info','Warning','Error')]
+        [string]$Type = 'Info'
+    )
+
+    $icon = switch ($Type) {
+        'Info'    { [System.Windows.Forms.MessageBoxIcon]::Information }
+        'Warning' { [System.Windows.Forms.MessageBoxIcon]::Warning }
+        'Error'   { [System.Windows.Forms.MessageBoxIcon]::Error }
+    }
+
+    [System.Windows.Forms.MessageBox]::Show(
+        $Message,
+        $Title,
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        $icon
+    ) | Out-Null
+}
+
+function Test-Winget {
+    return (Get-Command winget -ErrorAction SilentlyContinue)
+}
+
+function Test-AppInstaller {
+    try {
+        return (Get-AppxPackage Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue)
+    } catch {
+        return $null
+    }
+}
+
+function Install-Winget {
+    Write-Host "Installiere winget..." -ForegroundColor Yellow
+
+    $tmp = "$env:TEMP\winget.msixbundle"
+
+    try {
+        if (Test-Path $tmp) { Remove-Item $tmp -Force }
+
+        # stabiler Download (kein irm!)
+        $wc = New-Object System.Net.WebClient
+        $wc.DownloadFile("https://aka.ms/getwinget", $tmp)
+
+        if (-not (Test-Path $tmp)) {
+            throw "Download fehlgeschlagen"
+        }
+
+        Add-AppxPackage -Path $tmp
+        Start-Sleep -Seconds 5
+    }
+    catch {
+        Show-GuiMessage -Message "Winget konnte nicht installiert werden:`n$($_.Exception.Message)" -Type Error
+        throw
+    }
+}
+
+function Ensure-Winget {
+    if (Test-Winget) {
+        Write-Host "winget bereit." -ForegroundColor DarkGray
+        return
+    }
+
+    if (-not [Environment]::Is64BitProcess) {
+        Show-GuiMessage -Message "32-Bit PowerShell erkannt. Bitte 64-Bit verwenden." -Type Error
+        throw "x86 PowerShell"
+    }
+
+    if (-not (Test-AppInstaller)) {
+        Install-Winget
+    }
+
+    # nochmal prüfen
+    if (-not (Test-Winget)) {
+        Show-GuiMessage -Message "winget ist nach Installation noch nicht verfügbar. Bitte Script neu starten." -Type Warning
+        throw "winget fehlt"
+    }
+}
+
+# 🔥 HIER AUSFÜHREN (wichtig!)
+Ensure-Winget
+
+
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 } catch {}
