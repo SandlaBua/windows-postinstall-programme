@@ -4,9 +4,9 @@
         Programs = @(
             [pscustomobject]@{ Name = 'Brave';        Id = 'Brave.Brave';       Scope = 'machine'; PreKill = @('brave') }
             [pscustomobject]@{ Name = 'Chrome';       Id = 'Google.Chrome';     Scope = 'machine'; PreKill = @('chrome') }
+            [pscustomobject]@{ Name = 'WhatsApp';     Id = 'WhatsApp.WhatsApp'; Scope = 'user';    PreKill = @('whatsapp') }
             [pscustomobject]@{ Name = 'Spotify';      Id = 'Spotify.Spotify';   Scope = 'user';    PreKill = @('spotify') }
             [pscustomobject]@{ Name = 'Discord';      Id = 'Discord.Discord';   Scope = 'user';    PreKill = @('discord', 'update') }
-            [pscustomobject]@{ Name = 'WhatsApp';     Id = 'WhatsApp.WhatsApp'; Scope = 'user';    PreKill = @('whatsapp') }
             [pscustomobject]@{ Name = 'Vencord';               Id = 'Vendicated.Vencord';          Scope = 'user';    PreKill = @('discord', 'vencordinstaller') }
         )
     }
