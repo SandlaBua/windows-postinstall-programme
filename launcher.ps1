@@ -64,7 +64,7 @@ function Restart-AsAdminFromUrl {
 
         $command = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm '$ScriptUrl' | iex"
 
-        Start-Process -FilePath $powershellPath -Verb RunAs -ArgumentList @(
+        Start-Process -FilePath $powershellPath -Verb RunAs -WindowStyle Hidden -ArgumentList @(
             "-NoProfile",
             "-ExecutionPolicy", "Bypass",
             "-Command", $command
@@ -145,17 +145,17 @@ function Show-ProgramSelector {
         [array]$Categories
     )
 
-    $columns = 3
-    $panelWidth = 355
-    $panelHeight = 255
-    $panelMarginX = 15
-    $panelMarginY = 15
-    $startX = 20
-    $startY = 90
+    $columnWidth = 240
+    $columnSpacing = 18
+    $leftMargin = 20
+    $topMargin = 95
 
-    $rows = [math]::Ceiling($Categories.Count / $columns)
-    $formWidth = ($startX * 2) + ($columns * $panelWidth) + (($columns - 1) * $panelMarginX) + 20
-    $formHeight = 170 + ($rows * $panelHeight) + (($rows - 1) * $panelMarginY) + 85
+    $maxPrograms = ($Categories | ForEach-Object { $_.Programs.Count } | Measure-Object -Maximum).Maximum
+    if (-not $maxPrograms) { $maxPrograms = 1 }
+
+    $contentHeight = 80 + ($maxPrograms * 24)
+    $formWidth = ($leftMargin * 2) + ($Categories.Count * $columnWidth) + (($Categories.Count - 1) * $columnSpacing) + 20
+    $formHeight = [Math]::Max(420, 190 + $contentHeight)
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Programme installieren'
@@ -177,7 +177,7 @@ function Show-ProgramSelector {
     $form.Controls.Add($titleLabel)
 
     $subLabel = New-Object System.Windows.Forms.Label
-    $subLabel.Text = 'Programme einzeln auswählen oder pro Spalte komplett markieren.'
+    $subLabel.Text = 'Von links nach rechts nach Kategorien sortiert. Programme einzeln oder pro Spalte komplett auswählen.'
     $subLabel.Font = New-Object System.Drawing.Font('Segoe UI', 9)
     $subLabel.ForeColor = [System.Drawing.Color]::Gainsboro
     $subLabel.AutoSize = $true
@@ -188,72 +188,51 @@ function Show-ProgramSelector {
 
     for ($i = 0; $i -lt $Categories.Count; $i++) {
         $category = $Categories[$i]
-
-        $row = [math]::Floor($i / $columns)
-        $col = $i % $columns
-
-        $x = $startX + ($col * ($panelWidth + $panelMarginX))
-        $y = $startY + ($row * ($panelHeight + $panelMarginY))
-
-        $panel = New-Object System.Windows.Forms.Panel
-        $panel.Location = New-Object System.Drawing.Point($x, $y)
-        $panel.Size = New-Object System.Drawing.Size($panelWidth, $panelHeight)
-        $panel.BackColor = [System.Drawing.Color]::FromArgb(38, 38, 38)
-        $panel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-        $panel.AutoScroll = $true
-        $form.Controls.Add($panel)
+        $x = $leftMargin + ($i * ($columnWidth + $columnSpacing))
 
         $header = New-Object System.Windows.Forms.Label
         $header.Text = $category.Name
         $header.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
         $header.ForeColor = [System.Drawing.Color]::White
         $header.AutoSize = $true
-        $header.Location = New-Object System.Drawing.Point(12, 12)
-        $panel.Controls.Add($header)
+        $header.Location = New-Object System.Drawing.Point($x, $topMargin)
+        $form.Controls.Add($header)
 
         $selectAll = New-Object System.Windows.Forms.CheckBox
         $selectAll.Text = 'Alles auswählen'
         $selectAll.Font = New-Object System.Drawing.Font('Segoe UI', 9)
         $selectAll.ForeColor = [System.Drawing.Color]::White
-        $selectAll.BackColor = [System.Drawing.Color]::FromArgb(38, 38, 38)
+        $selectAll.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
         $selectAll.AutoSize = $true
-        $selectAll.Location = New-Object System.Drawing.Point(14, 40)
-        $panel.Controls.Add($selectAll)
+        $selectAll.Location = New-Object System.Drawing.Point($x, $topMargin + 28)
+        $form.Controls.Add($selectAll)
 
-        $programCheckBoxes = New-Object System.Collections.Generic.List[System.Windows.Forms.CheckBox]
-        $entryObjects = New-Object System.Collections.Generic.List[object]
-
-        $itemY = 68
+        $children = New-Object System.Collections.Generic.List[System.Windows.Forms.CheckBox]
+        $y = $topMargin + 58
 
         foreach ($program in $category.Programs) {
             $cb = New-Object System.Windows.Forms.CheckBox
             $cb.Text = $program.Name
             $cb.Font = New-Object System.Drawing.Font('Segoe UI', 9)
             $cb.ForeColor = [System.Drawing.Color]::White
-            $cb.BackColor = [System.Drawing.Color]::FromArgb(38, 38, 38)
+            $cb.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
             $cb.AutoSize = $true
-            $cb.Location = New-Object System.Drawing.Point(17, $itemY)
-            $panel.Controls.Add($cb)
+            $cb.Location = New-Object System.Drawing.Point($x + 4, $y)
+            $form.Controls.Add($cb)
 
-            $programCheckBoxes.Add($cb)
-
-            $entry = [pscustomobject]@{
+            $children.Add($cb)
+            $allProgramEntries.Add([pscustomobject]@{
                 Category = $category.Name
                 Program  = $program
                 CheckBox = $cb
-            }
+            })
 
-            $entryObjects.Add($entry)
-            $allProgramEntries.Add($entry)
-
-            $itemY += 24
+            $y += 24
         }
 
-        $selectAll.Tag = @($programCheckBoxes.ToArray())
-
+        $selectAll.Tag = @($children.ToArray())
         $selectAll.Add_CheckedChanged({
-            $children = @($this.Tag)
-            foreach ($child in $children) {
+            foreach ($child in @($this.Tag)) {
                 $child.Checked = $this.Checked
             }
         })
