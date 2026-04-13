@@ -1,186 +1,192 @@
-# Windows Postinstall Programme
+# windows-postinstall-programme
 
-Automatisiertes PowerShell-Tool zum Installieren von Programmen über eine GUI nach einer frischen Windows-Installation.
+PowerShell-Tool für die Programminstallation nach einer frischen Windows-Installation.
 
----
-
-## 🚀 Start
-
-Einfach in **PowerShell (64-Bit, als Administrator)** ausführen:
-
-```powershell
-irm https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/launcher.ps1 | iex
-```
+Die Auswahl erfolgt über eine GUI im Dark Mode.
+Programme sind in Kategorien aufgeteilt und können entweder **einzeln** oder **komplett pro Spalte** ausgewählt werden.
 
 ---
 
-## ⚠️ Voraussetzungen
+## Features
 
-* Windows 10 / 11
-* Internetverbindung
-* **64-Bit PowerShell (kein x86!)**
-* Administratorrechte
-
-Das Script:
-
-* installiert automatisch **winget**, falls es fehlt
-* zeigt Fehler als **GUI**
-* gibt am Ende eine **Zusammenfassung aller fehlgeschlagenen Installationen**
-
----
-
-## 🧠 Features
-
-* GUI zur Auswahl von Programmkategorien
-* Automatische Installation via `winget`
-* Fallback-Mechanismen für frische Systeme
-* Fehlerhandling mit GUI
-* Übersicht am Ende:
-
-  * fehlgeschlagene Profile
-  * fehlgeschlagene Programme
+* Dark-Mode GUI
+* Programme nach Kategorien in Spalten sortiert
+* Einzelne Programme auswählbar
+* "Alles auswählen" pro Spalte
+* Automatische Installation per `winget`
+* Prüft, ob `winget` vorhanden ist
+* Installiert `winget` bei Bedarf automatisch
+* Fehler werden per GUI angezeigt
+* Abschluss-Zusammenfassung mit fehlgeschlagenen Paketen
 
 ---
 
-## 📦 Kategorien
+## Struktur
 
-### 🌐 Browser & Kommunikation
-
-* Brave
-* Google Chrome
-* Spotify
-* Discord
-* WhatsApp
-
----
-
-### 🎮 Gaming & Launcher
-
-* Steam
-* EA App
-* Epic Games Launcher
-* Ubisoft Connect
-* CurseForge
-* Google Play Games
-* Rockstar Games Launcher
-* Medal
-* Vencord
-
----
-
-### 🖥️ Hardware & Tools
-
-* Logitech G HUB
-* Logi Options+
-* PreSonus Universal Control
-* EdgeTX Companion
-* HWiNFO
-
----
-
-### 🌐 Remote & Netzwerk
-
-* Moonlight
-* Sunshine
-* Parsec
-* Tailscale
-
----
-
-### 🧰 Media & Utilities
-
-* 7-Zip
-* Winaero Tweaker
-* MakeMKV
-* HandBrake
-* balenaEtcher
-* WinSCP
-* AnyBurn
-* Raspberry Pi Imager
-* Rufus
-
----
-
-### 🖨️ 3D & Printing
-
-* Creality Scan
-* Bambu Studio
-
----
-
-## ❌ Nicht automatisch installiert
-
-Diese Programme sind aktuell **nicht stabil über winget automatisierbar** oder absichtlich ausgeschlossen:
-
-* Autodesk Fusion 360
-* VMware Workstation
-* 8BitDo Software
-* Easy Smart Configuration Utility
-* deej
-
----
-
-### ❌ winget fehlt
-
-Das Script installiert es automatisch.
-Falls es danach noch nicht geht:
-
-* PowerShell neu starten
-* Script erneut ausführen
-
----
-
-### ❌ Falsche PowerShell
-
-Wenn du **Windows PowerShell (x86)** nutzt:
-
-👉 wird blockiert (absichtlich)
-
----
-
-## 📁 Struktur
-
-```
+```text
 windows-postinstall-programme/
 │
 ├─ launcher.ps1
+├─ launcher.vbs
+│
 ├─ lib/
 │  └─ common.ps1
-└─ profiles/
-   ├─ browser-communication.ps1
-   ├─ gaming.ps1
-   ├─ hardware-tools.ps1
-   ├─ remote-network.ps1
-   ├─ media-utility.ps1
-   └─ printing-3d.ps1
+│
+└─ config/
+   └─ packages.ps1
 ```
 
 ---
 
-## 💡 Hinweis
+## Dateien
 
-Dieses Tool ist gedacht für:
+### `launcher.ps1`
 
-* frische Windows Installationen
-* schnelles Setup von Arbeitsumgebungen
-* homelab / gaming setups
+Das Hauptscript.
 
----
+Aufgaben:
 
-## 🧠 Empfehlung
-
-Nicht alles blind installieren –
-wähle nur das, was du wirklich brauchst.
-
----
-
-## 🛠️ ToDo (optional)
-
-* Logfile export
-* Dark Mode GUI 😄
+* GUI anzeigen
+* Programme aus `config/packages.ps1` laden
+* Auswahl verarbeiten
+* Installation starten
+* Abschluss-Zusammenfassung anzeigen
 
 ---
 
-## 👤 Author
+### `lib/common.ps1`
+
+Gemeinsame Funktionen.
+
+Enthält u. a.:
+
+* GUI-Meldungen
+* `winget`-Prüfung
+* automatische `winget`-Installation
+* Download per `Start-BitsTransfer` mit Fallback auf `curl.exe`
+* Paketinstallation mit `Scope`, `PreKill` und Fehlerbehandlung
+
+---
+
+### `config/packages.ps1`
+
+Zentrale Paketliste.
+
+Hier sind alle Programme nach Kategorien definiert, z. B.:
+
+* Name
+* Winget-ID
+* Scope (`machine` / `user`)
+* Prozesse, die vor der Installation beendet werden sollen
+
+---
+
+### `launcher.vbs`
+
+Optionaler Starter, damit **keine PowerShell-Konsole sichtbar** ist.
+
+Wenn du die Konsole nicht sehen willst, starte **nicht direkt `launcher.ps1`**, sondern `launcher.vbs`.
+
+---
+
+## Start
+
+### Variante 1: Direkt über PowerShell
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main/launcher.ps1 | iex
+```
+
+### Variante 2: Ohne sichtbare Shell
+
+Über `launcher.vbs`
+
+---
+
+## Voraussetzungen
+
+* Windows 10 oder Windows 11
+* Internetverbindung
+* 64-Bit PowerShell
+* Administratorrechte
+
+---
+
+## Hinweis zu 32-Bit PowerShell
+
+Die 32-Bit Version von Windows PowerShell (`x86`) wird absichtlich blockiert.
+
+Wenn das Script in `Windows PowerShell (x86)` gestartet wird, erscheint eine Fehlermeldung.
+
+Verwende die normale 64-Bit PowerShell.
+
+---
+
+## Kategorien
+
+Aktuell sind die Programme in diese Kategorien aufgeteilt:
+
+* Browser & Kommunikation
+* Gaming & Launcher
+* Hardware Tools
+* Remote & Netzwerk
+* Media & Utility
+* 3D & Printing
+
+Die eigentlichen Programme stehen in `config/packages.ps1`.
+
+---
+
+## Anpassungen
+
+Wenn du Programme hinzufügen, entfernen oder verschieben willst, musst du nur `config/packages.ps1` ändern.
+
+Die GUI baut sich daraus automatisch neu auf.
+
+Du musst also nicht jedes Mal den Launcher selbst umbauen.
+
+---
+
+## Bekannte Hinweise
+
+### TLS / SSL Fehler
+
+Falls beim Start über `irm` ein TLS- oder SSL-Fehler kommt, nutze:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+```
+
+Direkt vor dem `irm`-Befehl.
+
+---
+
+### `winget` fehlt
+
+Wenn `winget` auf einem frischen Windows nicht vorhanden ist, versucht `common.ps1`, es automatisch zu installieren.
+
+Falls `winget` danach noch nicht verfügbar ist:
+
+* PowerShell schließen
+* neu als Administrator öffnen
+* Launcher erneut starten
+
+---
+
+### Keine Konsole sichtbar
+
+Das geht nicht sauber, wenn du den Launcher direkt per `irm ... | iex` startest.
+
+Wenn du **gar keine Shell sehen willst**, nutze `launcher.vbs`.
+
+---
+
+## Ziel des Projekts
+
+Das Projekt ist dafür gedacht, nach einer Windows-Neuinstallation schnell die wichtigsten Programme einzurichten, ohne alles manuell zusammensuchen und installieren zu müssen.
+
+---
+
+## Author
 
 Benedikt Sandler
