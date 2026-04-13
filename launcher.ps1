@@ -127,8 +127,8 @@ function New-DarkButton {
 
     $button = New-Object System.Windows.Forms.Button
     $button.Text = $Text
-    $button.Size = New-Object System.Drawing.Size($Width, $Height)
-    $button.Location = New-Object System.Drawing.Point($X, $Y)
+    $button.Size = New-Object System.Drawing.Size -ArgumentList $Width, $Height
+    $button.Location = New-Object System.Drawing.Point -ArgumentList $X, $Y
     $button.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 50)
     $button.ForeColor = [System.Drawing.Color]::White
     $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -159,7 +159,7 @@ function Show-ProgramSelector {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Programme installieren'
-    $form.Size = New-Object System.Drawing.Size($formWidth, $formHeight)
+    $form.Size = New-Object System.Drawing.Size -ArgumentList $formWidth, $formHeight
     $form.StartPosition = 'CenterScreen'
     $form.TopMost = $true
     $form.FormBorderStyle = 'FixedDialog'
@@ -173,7 +173,7 @@ function Show-ProgramSelector {
     $titleLabel.Font = New-Object System.Drawing.Font('Segoe UI', 14, [System.Drawing.FontStyle]::Bold)
     $titleLabel.ForeColor = [System.Drawing.Color]::White
     $titleLabel.AutoSize = $true
-    $titleLabel.Location = New-Object System.Drawing.Point(20, 15)
+    $titleLabel.Location = New-Object System.Drawing.Point -ArgumentList 20, 15
     $form.Controls.Add($titleLabel)
 
     $subLabel = New-Object System.Windows.Forms.Label
@@ -181,7 +181,7 @@ function Show-ProgramSelector {
     $subLabel.Font = New-Object System.Drawing.Font('Segoe UI', 9)
     $subLabel.ForeColor = [System.Drawing.Color]::Gainsboro
     $subLabel.AutoSize = $true
-    $subLabel.Location = New-Object System.Drawing.Point(22, 48)
+    $subLabel.Location = New-Object System.Drawing.Point -ArgumentList 22, 48
     $form.Controls.Add($subLabel)
 
     $allProgramEntries = New-Object System.Collections.Generic.List[object]
@@ -195,7 +195,7 @@ function Show-ProgramSelector {
         $header.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
         $header.ForeColor = [System.Drawing.Color]::White
         $header.AutoSize = $true
-        $header.Location = New-Object System.Drawing.Point($x, $topMargin)
+        $header.Location = New-Object System.Drawing.Point -ArgumentList $x, $topMargin
         $form.Controls.Add($header)
 
         $selectAll = New-Object System.Windows.Forms.CheckBox
@@ -204,7 +204,7 @@ function Show-ProgramSelector {
         $selectAll.ForeColor = [System.Drawing.Color]::White
         $selectAll.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
         $selectAll.AutoSize = $true
-        $selectAll.Location = New-Object System.Drawing.Point($x, $topMargin + 28)
+        $selectAll.Location = New-Object System.Drawing.Point -ArgumentList $x, ($topMargin + 28)
         $form.Controls.Add($selectAll)
 
         $children = New-Object System.Collections.Generic.List[System.Windows.Forms.CheckBox]
@@ -217,7 +217,7 @@ function Show-ProgramSelector {
             $cb.ForeColor = [System.Drawing.Color]::White
             $cb.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
             $cb.AutoSize = $true
-            $cb.Location = New-Object System.Drawing.Point($x + 4, $y)
+            $cb.Location = New-Object System.Drawing.Point -ArgumentList ($x + 4), $y
             $form.Controls.Add($cb)
 
             $children.Add($cb)
@@ -277,7 +277,7 @@ function Show-InstallStatusWindow {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Installation läuft'
-    $form.Size = New-Object System.Drawing.Size(540, 175)
+    $form.Size = New-Object System.Drawing.Size -ArgumentList 540, 175
     $form.StartPosition = 'CenterScreen'
     $form.TopMost = $true
     $form.FormBorderStyle = 'FixedDialog'
@@ -291,7 +291,7 @@ function Show-InstallStatusWindow {
     $title.Font = New-Object System.Drawing.Font('Segoe UI', 12, [System.Drawing.FontStyle]::Bold)
     $title.ForeColor = [System.Drawing.Color]::White
     $title.AutoSize = $true
-    $title.Location = New-Object System.Drawing.Point(20, 18)
+    $title.Location = New-Object System.Drawing.Point -ArgumentList 20, 18
     $form.Controls.Add($title)
 
     $status = New-Object System.Windows.Forms.Label
@@ -299,12 +299,12 @@ function Show-InstallStatusWindow {
     $status.Font = New-Object System.Drawing.Font('Segoe UI', 10)
     $status.ForeColor = [System.Drawing.Color]::Gainsboro
     $status.AutoSize = $true
-    $status.Location = New-Object System.Drawing.Point(22, 55)
+    $status.Location = New-Object System.Drawing.Point -ArgumentList 22, 55
     $form.Controls.Add($status)
 
     $progress = New-Object System.Windows.Forms.ProgressBar
-    $progress.Location = New-Object System.Drawing.Point(22, 88)
-    $progress.Size = New-Object System.Drawing.Size(480, 22)
+    $progress.Location = New-Object System.Drawing.Point -ArgumentList 22, 88
+    $progress.Size = New-Object System.Drawing.Size -ArgumentList 480, 22
     $progress.Style = 'Continuous'
     $form.Controls.Add($progress)
 
@@ -313,7 +313,7 @@ function Show-InstallStatusWindow {
     $counter.Font = New-Object System.Drawing.Font('Segoe UI', 9)
     $counter.ForeColor = [System.Drawing.Color]::Gainsboro
     $counter.AutoSize = $true
-    $counter.Location = New-Object System.Drawing.Point(22, 118)
+    $counter.Location = New-Object System.Drawing.Point -ArgumentList 22, 118
     $form.Controls.Add($counter)
 
     $form.Show()
