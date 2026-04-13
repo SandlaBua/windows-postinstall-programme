@@ -3,7 +3,16 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
-Start-Sleep -Seconds 10
+# 🔽 DAS HIER NEU
+Start-Sleep -Seconds 15
+
+for ($i=0; $i -lt 30; $i++) {
+    if (Get-AppxPackage Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue) {
+        break
+    }
+    Start-Sleep -Seconds 2
+}
+# 🔼
 
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
