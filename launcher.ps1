@@ -78,25 +78,6 @@ function Restart-AsAdminFromUrl {
     }
 }
 
-function Import-RemoteScript {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Url
-    )
-
-    if ($Url -match 'refs/heads') {
-        throw "Falscher GitHub-Link erkannt: $Url"
-    }
-
-    $code = Invoke-RestMethod -Uri $Url -ErrorAction Stop
-
-    if ([string]::IsNullOrWhiteSpace($code)) {
-        throw "Remote-Datei ist leer: $Url"
-    }
-
-    . ([scriptblock]::Create($code))
-}
-
 function Get-RemoteObject {
     param(
         [Parameter(Mandatory = $true)]
@@ -395,7 +376,14 @@ if (-not (Test-IsAdmin)) {
 }
 
 try {
-    Import-RemoteScript -Url $script:CommonUrl
+    # common.ps1 MUSS auf Top-Level geladen werden, nicht in einer Funktion,
+    # sonst landen seine Funktionen nur im Funktions-Scope
+    $commonCode = Invoke-RestMethod -Uri $script:CommonUrl -ErrorAction Stop
+    if ([string]::IsNullOrWhiteSpace($commonCode)) {
+        throw "lib/common.ps1 ist leer."
+    }
+    . ([scriptblock]::Create($commonCode))
+
     $categories = Get-RemoteObject -Url $script:PackagesUrl
 
     if (-not $categories -or $categories.Count -eq 0) {
