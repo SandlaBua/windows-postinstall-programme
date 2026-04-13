@@ -1,10 +1,13 @@
+if ($script:CommonLoaded) { return }
+$script:CommonLoaded = $true
+
 $ErrorActionPreference = 'Stop'
 
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 } catch {}
 
-Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Forms | Out-Null
 Add-Type -AssemblyName System.Drawing | Out-Null
 
 if (-not $global:PostInstallFailedPackages) {
@@ -70,7 +73,7 @@ function Show-StatusWindow {
     $label.Text = $InitialText
     $label.ForeColor = [System.Drawing.Color]::White
     $label.BackColor = [System.Drawing.Color]::Transparent
-    $label.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    $label.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Regular)
     $label.AutoSize = $true
     $label.Location = New-Object System.Drawing.Point(20, 20)
 
@@ -130,7 +133,17 @@ function Test-Is64BitProcess {
 }
 
 function Get-WingetCommand {
-    return Get-Command winget -ErrorAction SilentlyContinue
+    $cmd = Get-Command winget -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return $cmd
+    }
+
+    $fallbackPath = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe'
+    if (Test-Path -Path $fallbackPath -PathType Leaf) {
+        return $fallbackPath
+    }
+
+    return $null
 }
 
 function Test-AppInstallerPackage {
@@ -159,14 +172,16 @@ function Download-File {
         if ($bits) {
             Write-Host "Download mit Start-BitsTransfer..." -ForegroundColor DarkGray
             Start-BitsTransfer -Source $Url -Destination $Destination -ErrorAction Stop
-            $downloaded = $true
+            if ((Test-Path -Path $Destination -PathType Leaf) -and ((Get-Item $Destination).Length -gt 0)) {
+                $downloaded = $true
+            }
         }
     }
     catch {
         Write-Host "BITS-Download fehlgeschlagen: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 
-    if ($downloaded -and (Test-Path $Destination)) {
+    if ($downloaded) {
         return
     }
 
@@ -175,7 +190,7 @@ function Download-File {
         if ($curl) {
             Write-Host "Download mit curl.exe..." -ForegroundColor DarkGray
             & curl.exe -L $Url -o $Destination --silent --show-error
-            if ($LASTEXITCODE -eq 0 -and (Test-Path $Destination)) {
+            if ($LASTEXITCODE -eq 0 -and (Test-Path -Path $Destination -PathType Leaf) -and ((Get-Item $Destination).Length -gt 0)) {
                 $downloaded = $true
             }
         }
@@ -184,7 +199,7 @@ function Download-File {
         Write-Host "curl-Download fehlgeschlagen: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 
-    if (-not $downloaded -or -not (Test-Path $Destination)) {
+    if (-not $downloaded) {
         throw "Datei konnte nicht heruntergeladen werden: $Url"
     }
 }
@@ -206,13 +221,13 @@ und führe den Launcher dann erneut aus.
     $bundlePath = Join-Path $env:TEMP 'Microsoft.DesktopAppInstaller.msixbundle'
 
     try {
-        if (Test-Path $bundlePath) {
+        if (Test-Path -Path $bundlePath -PathType Leaf) {
             Remove-Item $bundlePath -Force -ErrorAction SilentlyContinue
         }
 
         Download-File -Url 'https://aka.ms/getwinget' -Destination $bundlePath
 
-        if (-not (Test-Path $bundlePath)) {
+        if (-not (Test-Path -Path $bundlePath -PathType Leaf)) {
             throw "Die heruntergeladene Datei wurde nicht gefunden."
         }
 
@@ -323,7 +338,7 @@ function Install-WingetPackage {
 
     if ($SkipIfInstalled -and (Test-WingetPackageInstalled -Id $Id)) {
         Write-Host "Bereits installiert: $Id" -ForegroundColor DarkGray
-        return
+        return $true
     }
 
     if ($PreKill.Count -gt 0) {
@@ -350,12 +365,14 @@ function Install-WingetPackage {
 
         if ($proc.ExitCode -eq 0) {
             Write-Host "OK: $Id" -ForegroundColor Green
+            return $true
         }
         else {
             Add-FailedPackage -Id $Id
             $msg = "Installation von '$Id' ist fehlgeschlagen. ExitCode: $($proc.ExitCode)"
             Show-GuiMessage -Message $msg -Title 'Paketinstallation fehlgeschlagen' -Type Warning
             Write-Host $msg -ForegroundColor Yellow
+            return $false
         }
     }
     catch {
@@ -363,6 +380,7 @@ function Install-WingetPackage {
         $msg = "Fehler bei '$Id': $($_.Exception.Message)"
         Show-GuiMessage -Message $msg -Title 'Paketinstallation fehlgeschlagen' -Type Error
         Write-Host $msg -ForegroundColor Red
+        return $false
     }
 }
 
