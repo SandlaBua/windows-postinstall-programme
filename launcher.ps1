@@ -1,14 +1,31 @@
-Start-Sleep -Seconds 10
-
 [CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
 
+Start-Sleep -Seconds 10
+
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+} catch {}
+
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$global:PostInstallFailedPackages = New-Object System.Collections.Generic.List[string]
+
+$script:RepoBase = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main'
+$script:LauncherUrl = "$($script:RepoBase)/launcher.ps1"
+$script:CommonUrl   = "$($script:RepoBase)/lib/common.ps1"
+$script:PackagesUrl = "$($script:RepoBase)/config/packages.ps1"
+
 function Show-GuiMessage {
     param(
+        [Parameter(Mandatory = $true)]
         [string]$Message,
+
         [string]$Title = 'Windows Postinstall',
+
         [ValidateSet('Info','Warning','Error')]
         [string]$Type = 'Info'
     )
@@ -45,9 +62,10 @@ function Install-Winget {
     $tmp = "$env:TEMP\winget.msixbundle"
 
     try {
-        if (Test-Path $tmp) { Remove-Item $tmp -Force }
+        if (Test-Path $tmp) {
+            Remove-Item $tmp -Force
+        }
 
-        # stabiler Download (kein irm!)
         $wc = New-Object System.Net.WebClient
         $wc.DownloadFile("https://aka.ms/getwinget", $tmp)
 
@@ -59,7 +77,7 @@ function Install-Winget {
         Start-Sleep -Seconds 5
     }
     catch {
-        Show-GuiMessage -Message "Winget konnte nicht installiert werden:`n$($_.Exception.Message)" -Type Error
+        Show-GuiMessage -Message "Winget konnte nicht installiert werden:`n$($_.Exception.Message)" -Title 'Winget Fehler' -Type Error
         throw
     }
 }
@@ -71,7 +89,7 @@ function Ensure-Winget {
     }
 
     if (-not [Environment]::Is64BitProcess) {
-        Show-GuiMessage -Message "32-Bit PowerShell erkannt. Bitte 64-Bit verwenden." -Type Error
+        Show-GuiMessage -Message "32-Bit PowerShell erkannt. Bitte 64-Bit verwenden." -Title 'Falsche PowerShell-Version' -Type Error
         throw "x86 PowerShell"
     }
 
@@ -79,54 +97,10 @@ function Ensure-Winget {
         Install-Winget
     }
 
-    # nochmal prüfen
     if (-not (Test-Winget)) {
-        Show-GuiMessage -Message "winget ist nach Installation noch nicht verfügbar. Bitte Script neu starten." -Type Warning
+        Show-GuiMessage -Message "winget ist nach der Installation noch nicht verfügbar. Bitte Script neu starten." -Title 'Winget noch nicht bereit' -Type Warning
         throw "winget fehlt"
     }
-}
-
-# 🔥 HIER AUSFÜHREN (wichtig!)
-Ensure-Winget
-
-
-try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-} catch {}
-
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-
-$global:PostInstallFailedPackages = New-Object System.Collections.Generic.List[string]
-
-$script:RepoBase = 'https://raw.githubusercontent.com/SandlaBua/windows-postinstall-programme/main'
-$script:LauncherUrl = "$($script:RepoBase)/launcher.ps1"
-$script:CommonUrl   = "$($script:RepoBase)/lib/common.ps1"
-$script:PackagesUrl = "$($script:RepoBase)/config/packages.ps1"
-
-function Show-GuiMessage {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Message,
-
-        [string]$Title = 'Windows Postinstall',
-
-        [ValidateSet('Info', 'Warning', 'Error')]
-        [string]$Type = 'Info'
-    )
-
-    $icon = switch ($Type) {
-        'Info'    { [System.Windows.Forms.MessageBoxIcon]::Information }
-        'Warning' { [System.Windows.Forms.MessageBoxIcon]::Warning }
-        'Error'   { [System.Windows.Forms.MessageBoxIcon]::Error }
-    }
-
-    [System.Windows.Forms.MessageBox]::Show(
-        $Message,
-        $Title,
-        [System.Windows.Forms.MessageBoxButtons]::OK,
-        $icon
-    ) | Out-Null
 }
 
 function Test-IsAdmin {
@@ -462,9 +436,9 @@ if (-not (Test-IsAdmin)) {
     Restart-AsAdminFromUrl -ScriptUrl $script:LauncherUrl
 }
 
+Ensure-Winget
+
 try {
-    # common.ps1 MUSS auf Top-Level geladen werden, nicht in einer Funktion,
-    # sonst landen seine Funktionen nur im Funktions-Scope
     $commonCode = Invoke-RestMethod -Uri $script:CommonUrl -ErrorAction Stop
     if ([string]::IsNullOrWhiteSpace($commonCode)) {
         throw "lib/common.ps1 ist leer."
